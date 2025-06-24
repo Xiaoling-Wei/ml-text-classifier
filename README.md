@@ -1,4 +1,4 @@
-python
+python \n
 python -m venv mystreamlitapp
 mystreamlitapp1\Scripts\activa
 cd streamlit_ml_ap
