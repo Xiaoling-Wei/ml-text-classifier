@@ -1,9 +1,9 @@
-python \n
-python -m venv mystreamlitapp
-mystreamlitapp1\Scripts\activa
-cd streamlit_ml_ap
-pip install -r requirements.txt
-streamlit run app.py
+python  
+python -m venv mystreamlitapp  
+mystreamlitapp1\Scripts\activa  
+cd streamlit_ml_ap  
+pip install -r requirements.txt  
+streamlit run app.py  
 
 # 🤖 ML Text Classification App
 
