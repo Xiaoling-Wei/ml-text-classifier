@@ -7,6 +7,10 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+import tensorflow as tf
+
+MAX_SEQUENCE_LENGTH = 200
 
 # Page Configuration
 st.set_page_config(
@@ -62,6 +66,12 @@ def load_models():
             models['vectorizer_available'] = True
         except FileNotFoundError:
             models['vectorizer_available'] = False
+
+        try:
+            models['tokenizer'] = joblib.load('models/tokenizer.pkl')
+            models['tokenizer_available'] = True
+        except FileNotFoundError:
+            models['tokenizer_available'] = False
         
         # Load  adaboost model
         try:
@@ -82,8 +92,27 @@ def load_models():
         except FileNotFoundError:
             models['svm_available'] = False
         
+        try:
+            models['cnn'] = tf.keras.models.load_model('models/cnn_model.keras')
+            models['cnn_available'] = True
+        except FileNotFoundError:
+            models['cnn_available'] = False
+
+        try:
+            models['lstm'] = tf.keras.models.load_model('models/lstm_model.keras')
+            models['lstm_available'] = True
+        except FileNotFoundError:
+            models['lstm_available'] = False
+
+        try:
+            models['rnn'] = tf.keras.models.load_model('models/rnn_model.keras')
+            models['rnn_available'] = True
+        except FileNotFoundError:
+            models['rnn_available'] = False
+        
         # Check if at least one complete setup is available
-        individual_ready = models['vectorizer_available'] and (models['ada_available'] or models['dt_available'] or models["svm_available"])
+        individual_ready = models['vectorizer_available'] and (models['ada_available'] or models['dt_available'] or models["svm_available"]
+                                                               or models["cnn_available"] or models["lstm_available"] or models["rnn_available"])
         
         if not (models.get('pipeline_available') or individual_ready):
             st.error("No complete model setup found!")
@@ -94,6 +123,8 @@ def load_models():
     except Exception as e:
         st.error(f"Error loading models: {e}")
         return None
+    
+    
 
 # ============================================================================
 # PREDICTION FUNCTION
@@ -123,6 +154,58 @@ def make_prediction(text, model_choice, models):
         elif model_choice == "svm" and models.get('svm_available'):
             prediction = models['svm'].predict([text])[0]
             probabilities = models['svm'].predict_proba([text])[0]
+
+        elif model_choice == "cnn" and models.get('cnn_available'):
+            try:
+                tokenizer = models['tokenizer']
+                sequence = tokenizer.texts_to_sequences([text])
+                padded_sequence = pad_sequences(sequence, maxlen=MAX_SEQUENCE_LENGTH)
+                raw_pred = models['cnn'].predict(padded_sequence)
+                prob_val = raw_pred[0][0]
+                prediction = int(prob_val > 0.5)
+                probabilities = [1 - prob_val, prob_val]
+            
+                return ["Negative", "Positive"][prediction], probabilities
+                
+            except Exception as e:
+                import traceback
+                st.error(traceback.format_exc())
+                return None, None
+
+
+        elif model_choice == "lstm" and models.get('lstm_available'):
+            try:
+                tokenizer = models['tokenizer']
+                sequence = tokenizer.texts_to_sequences([text])
+                padded_sequence = pad_sequences(sequence, maxlen=MAX_SEQUENCE_LENGTH)
+                raw_pred = models['lstm'].predict(padded_sequence)
+                prob_val = raw_pred[0][0]
+                prediction = int(prob_val > 0.5)
+                probabilities = [1 - prob_val, prob_val]
+            
+                return ["Negative", "Positive"][prediction], probabilities
+                
+            except Exception as e:
+                import traceback
+                st.error(traceback.format_exc())
+                return None, None
+
+        elif model_choice == "rnn" and models.get('rnn_available'):
+            try:
+                tokenizer = models['tokenizer']
+                sequence = tokenizer.texts_to_sequences([text])
+                padded_sequence = pad_sequences(sequence, maxlen=MAX_SEQUENCE_LENGTH)
+                raw_pred = models['rnn'].predict(padded_sequence)
+                prob_val = raw_pred[0][0]
+                prediction = int(prob_val > 0.5)
+                probabilities = [1 - prob_val, prob_val]
+            
+                return ["Negative", "Positive"][prediction], probabilities
+                
+            except Exception as e:
+                import traceback
+                st.error(traceback.format_exc())
+                return None, None
         
         if prediction is not None and probabilities is not None:
             # Convert to readable format
@@ -149,6 +232,13 @@ def get_available_models(models):
         available.append(("decision_tree", "🌲 Decision Tree"))
     if models.get('ada_available'):
         available.append(("adaboost", "📊 AdaBoost"))
+    if models.get('cnn_available'):
+        available.append(("cnn", "cnn"))
+    if models.get('lstm_available'):
+        available.append(("lstm", "LSTM"))
+    if models.get('rnn_available'):
+        available.append(("rnn", "rnn"))
+    
     
     return available
 
@@ -214,7 +304,7 @@ if page == "🏠 Home":
     if models:
         st.success("✅ Models loaded successfully!")
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
         
         with col1:
             if models.get('pipeline_available'):
@@ -237,6 +327,24 @@ if page == "🏠 Home":
                 st.warning("**🎯 decision tree**\n❌ Not Available")
         
         with col4:
+            if models.get('cnn_available') and models.get('vectorizer_available'):
+                st.info("**CNN**\n✅ Available")
+            else:
+                st.warning("**CNN**\n❌ Not Available")
+
+        with col5:
+            if models.get('lstm_available') and models.get('vectorizer_available'):
+                st.info("**LSTM**\n✅ Available")
+            else:
+                st.warning("**LSTM**\n❌ Not Available")
+
+        with col6:
+            if models.get('rnn_available') and models.get('vectorizer_available'):
+                st.info("**RNN**\n✅ Available")
+            else:
+                st.warning("**RNN**\n❌ Not Available")
+        
+        with col7:
             if models.get('vectorizer_available'):
                 st.info("**🔤 TF-IDF Vectorizer**\n✅ Available")
             else:
@@ -616,7 +724,11 @@ elif page == "📊 Model Info":
             ("tfidf_vectorizer.pkl", "TF-IDF Vectorizer", models.get('vectorizer_available', False)),
             ("dt_pipeline.pkl", "dt Classifier", models.get('dt_available', False)),
             ("svm_pipeline.pkl", "svm Classifier", models.get('svm_available', False)),
-            ("ada_pipeline.pkl", "ada Classifier", models.get('ada_available', False))
+            ("ada_pipeline.pkl", "ada Classifier", models.get('ada_available', False)),
+            ("cnn_model.keras", "cnn Classifier", models.get('cnn_available', False)),
+            ("lstm_model.keras", "lstm Classifier", models.get('lstm_available', False)),
+            ("rnn_model.keras", "rnn Classifier", models.get('rnn_available', False)),
+            ("tokenizer.pkl", "tokenizer", models.get('tokenizer_available', False))
         ]
         
         for filename, description, status in files_to_check:
@@ -729,6 +841,9 @@ Built with Streamlit
 - 📈 SVM
 - 🌲 Decision Tree
 - 📊 AdaBoost
+- CNN
+- LSTM
+- RNN
 
 **Framework:** scikit-learn
 **Deployment:** Streamlit Cloud Ready
